@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	
 
 	"brim/provider"
+	"brim/utils"
 
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/textinput"
@@ -27,14 +29,15 @@ func (i item) FilterValue() string { return i.title }
 type viewState int
 
 const (
-	stateInput viewState = iota
-	stateResults
+	stateInput viewState = 0
+	stateResults viewState = 1
 )
 
 type model struct {
 	state       viewState
 	textInput   textinput.Model
 	result_list list.Model
+	selectedItem item
 	err         error
 	width, height int
 }
@@ -64,6 +67,8 @@ func doSearch(query string) tea.Cmd {
 		return searchResultsMsg{items: items}
 	}
 }
+
+// func selectSearch(*items []list.Item, idx int )
 
 func initialModel() model {
 	ti := textinput.New()
@@ -99,10 +104,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == stateInput && m.textInput.Value() != "" {
 				return m, doSearch(m.textInput.Value())
 			}
-		case "esc":
+			if m.state == stateResults {
+				if i, ok := m.result_list.SelectedItem().(item); ok {
+					m.selectedItem = i
+					return m, utils.OpenURL(i.url)
+				}
+			}		
+	case "esc":
 			// go back to input from results
 			if m.state == stateResults {
 				m.state = stateInput
+				// m.selectedItem=nil
 				return m, nil
 			}
 		}
@@ -112,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := docStyle.GetFrameSize()
 		m.result_list.SetSize(msg.Width-h, msg.Height-v)
 
-	// search cmd's msg 
+	// search cmd's msg  
 	case searchResultsMsg:
 		if msg.err != nil {
 			m.err = msg.err
